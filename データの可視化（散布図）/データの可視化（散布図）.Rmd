@@ -1,0 +1,159 @@
+---
+title: "データの可視化（ヒストグラム）"
+date: "`r Sys.Date()`"
+author: Sort
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    self_contained: true
+---
+
+```{css, echo=FALSE}
+#content {
+    max-width: 100%;
+}
+```
+
+```{r, include=FALSE}
+library(rmdformats)
+
+knitr::opts_chunk$set(warning = F,
+                      message = F,
+                      comment = "",
+                      fig.align = "center")
+```
+
+この記事のコードをまとめたものは[Github](https://github.com/FruitGranola?tab=repositories)にあります。
+
+# 使用するパッケージ
+
+```{r}
+library(tidyverse)
+library(magrittr)
+```
+
+# ggplot2 の theme をあらかじめ設定しておく
+
+```{r}
+theme_set(theme_minimal(base_size = 15))
+```
+
+# 使用するデータ
+
+```{r}
+data <- read_csv("Data/House_of_Councilors_1996_2017.csv")
+```
+
+# データ内の変数名を確認する
+
+```{r}
+names(data)
+```
+
+# 2005年にデータを絞る
+
+```{r}
+data_2005 <- data %>% 
+  filter(year == 2005) %>%  # 2005年のデータに絞る
+  drop_na()
+```
+
+# 上位4政党に絞る
+
+今回は簡単のために上位4政党に絞る。
+
+```{r}
+data_2005 %>% 
+  ggplot(aes(x = party_jpn)) +
+  geom_bar() +
+  labs(x = "")
+```
+
+```{r}
+data_2005 %<>% filter(party_jpn %in% c("自民党", "民主党", "社民党", "共産党"))
+```
+
+# 散布図
+
+## 何の変哲もない散布図
+
+恐らく正の相関がみられる。ただ、左下の存在が気になる。
+（[この記事](https://qiita.com/FruitGranola/items/d9acd187bf5e93e5c57e)を読んでいる人はこのクラスタがなにか知っていると思うが...）
+
+```{r}
+data_2005 %>% 
+  ggplot(aes(x = exppv, y = voteshare)) +
+  geom_point() +
+  labs(x = "有権者一人当たりの選挙費用", y = "得票率", title = "選挙費用と得票率の散布図")
+```
+
+## 回帰直線を引きたい(信頼区間あり)
+
+とりま、どのような相関関係か知りたい場合は、回帰直線を引いてしまおう。
+
+```{r}
+data_2005 %>% 
+  ggplot(aes(x = exppv, y = voteshare)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "有権者一人当たりの選挙費用", y = "得票率", title = "選挙費用と得票率の散布図")
+```
+
+## 回帰直線を引きたい(信頼区間なし)
+
+信頼区間を出力したくない場合は、**se = F**を指定しよう。
+
+```{r}
+data_2005 %>% 
+  ggplot(aes(x = exppv, y = voteshare)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  labs(x = "有権者一人当たりの選挙費用", y = "得票率", title = "選挙費用と得票率の散布図")
+```
+
+## 多項式回帰の回帰直線を引く
+
+なんとなく見た感じだと、一次式の回帰直線よりも2次式の回帰直線のほうが当てはまりが良さそう。
+そんな時は**geom_smooth()**に**formula = **を使って、回帰直線の式を指定しよう。
+とりあえず、2次式と3次式の回帰直線を引いた。
+恐らく、左下のクラスタでは正の相関で、真ん中のクラスタから軽い正の相関もしくは無相関となっていると考えられる。
+
+```{r}
+data_2005 %>% 
+  ggplot(aes(x = exppv, y = voteshare)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2)) + # 二次式
+  geom_smooth(method = "lm", formula = y ~ poly(x, 3)) + # 三次式
+  labs(x = "有権者一人当たりの選挙費用", y = "得票率", title = "選挙費用と得票率の散布図")
+```
+
+## クラスタごとに層化する
+
+では実際に層化して散布図を作成する。
+見事に予想通りとなった。左下のクラスタは正の相関を見せているが、真ん中のクラスタでは無相関と小さな正の相関が見られた。
+このことから、回帰分析をする際は交差項を含める必要があると分かる。（大政党ダミーと言ったところか...）
+
+```{r}
+data_2005 %>% 
+  ggplot(aes(x = exppv, y = voteshare, color = party_jpn)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "有権者一人当たりの選挙費用", y = "得票率", 
+       title = "選挙費用と得票率の散布図",　color = "政党") # labs()で"color = "hoge""を指定するとlegendのタイトルを変更できる
+```
+
+## 大政党ダミーを作成し、層化した散布図を作成する
+
+実際に政党規模でダミー変数を作成し、層化した散布図を作成した。
+大政党よりも小政党のほうが傾きが大きいとわかった。
+
+```{r}
+data_2005 %>% 
+  mutate("dummy" = if_else(party_jpn %in% c("自民党", "民主党"), "大政党", "小政党")) %>% 
+  ggplot(aes(x = exppv, y = voteshare, color = dummy)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "有権者一人当たりの選挙費用", y = "得票率", 
+       title = "選挙費用と得票率の散布図",　color = "政党規模")
+```
+
