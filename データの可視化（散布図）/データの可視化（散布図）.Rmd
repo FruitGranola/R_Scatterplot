@@ -2,21 +2,10 @@
 title: "データの可視化（ヒストグラム）"
 date: "`r Sys.Date()`"
 author: Sort
-output:
-  rmdformats::readthedown:
-    highlight: kate
-    self_contained: true
+output: html_document
 ---
 
-```{css, echo=FALSE}
-#content {
-    max-width: 100%;
-}
-```
-
 ```{r, include=FALSE}
-library(rmdformats)
-
 knitr::opts_chunk$set(warning = F,
                       message = F,
                       comment = "",
@@ -101,7 +90,7 @@ data_2005 %>%
 
 ## 回帰直線を引きたい(信頼区間なし)
 
-信頼区間を出力したくない場合は、**se = F**を指定しよう。
+信頼区間を出力したくない場合は、`se = F`を指定しよう。
 
 ```{r}
 data_2005 %>% 
@@ -114,7 +103,7 @@ data_2005 %>%
 ## 多項式回帰の回帰直線を引く
 
 なんとなく見た感じだと、一次式の回帰直線よりも2次式の回帰直線のほうが当てはまりが良さそう。
-そんな時は**geom_smooth()**に**formula =**を使って、回帰直線の式を指定しよう。
+そんな時は`geom_smooth()`に`formula =`を使って、回帰直線の式を指定しよう。
 とりあえず、2次式と3次式の回帰直線を引いた。
 恐らく、左下のクラスタでは正の相関で、真ん中のクラスタから軽い正の相関もしくは無相関となっていると考えられる。
 
@@ -159,11 +148,13 @@ data_2005 %>%
 
 ## pointを工夫すると...
 
-**alpha =**と**size =**に過去の当選回数を指定した。
-当選回数が多いとpointの色が濃くなり、大きな点となる。
+`alpha =`と`size =`に過去の当選回数を指定した。当選回数が多いとpointの色が濃くなり、大きな点となる。
+また、`geom_point()`で点を出力すると点が見ずらい。そのため、`geom_jitter()`で点を散らして出力する。
 これを見ると、新人が不利であることや当選する政治家はしっかりと金を使っていることが分かる。
 
 ```{r}
+set.seed(1) # geom_jitter()の散らばり方はランダムのため、散らばり方を固定する。
+
 data_2005 %>% 
   ggplot(aes(x = exppv, y = smd)) +
   geom_smooth(method = "lm", se = F) +
